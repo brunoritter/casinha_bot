@@ -12,7 +12,7 @@ from telegram.ext import (
     Updater,
 )
 
-from config import token
+from config import token, forms_url
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -119,7 +119,6 @@ def done(update: Updater, context: CallbackContext):
 
 def upload_data(update: Updater, context: CallbackContext):
     logging.info(f"User '{update.message.chat['first_name']}' confirmed input data")
-    url = "https://docs.google.com/forms/d/e/1FAIpQLSe56fq8ZL33rCQ_vy1mmocmJtKOY8bfUA0On2c5jBpLAnvZYw/formResponse"
 
     data_dict = {key: value.lower() for key, value in context.user_data.items()}
     form_data = {
@@ -129,7 +128,7 @@ def upload_data(update: Updater, context: CallbackContext):
         "entry.2110430875": data_dict["comprador"],
     }
 
-    response = requests.post(url, data=form_data)
+    response = requests.post(forms_url, data=form_data)
     if response.ok:
         logging.info("Data successfully uploaded")
         update.message.reply_text("Registrei a compra. Bjs até a próxima")
