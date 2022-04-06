@@ -145,7 +145,6 @@ def upload_data(update: Updater, context: CallbackContext):
 
 def get_manual_data():
     url_manual_data = f"{config.data_sheet_url}{config.sheet_name_manual}"
-    print(url_manual_data)
     manual_data = pd.read_csv(url_manual_data)
     return manual_data
 
@@ -193,9 +192,9 @@ def get_data():
 
 
 def process_args(args):
-    month = args[0]
+    month = int(args[0])
     try:
-        year = args[1]
+        year = int(args[1])
     except IndexError:
         year = date.today().year
     return month, year
