@@ -207,7 +207,7 @@ def filter_target_month(data, month, year):
 
 
 def calculate_total_expenses(target_df):
-    total_month = target_df["valor"].sum()
+    total_month = round(target_df["valor"].sum(), 2)
     return total_month
 
 
