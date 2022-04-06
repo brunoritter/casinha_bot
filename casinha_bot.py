@@ -1,6 +1,9 @@
+from concurrent.futures import process
 import logging
+from datetime import date
 from typing import Dict
 
+import pandas as pd
 import requests
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (
@@ -12,7 +15,7 @@ from telegram.ext import (
     Updater,
 )
 
-from config import token, forms_url
+import config
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -128,7 +131,7 @@ def upload_data(update: Updater, context: CallbackContext):
         "entry.2110430875": data_dict["comprador"],
     }
 
-    response = requests.post(forms_url, data=form_data)
+    response = requests.post(config.forms_url, data=form_data)
     if response.ok:
         logging.info("Data successfully uploaded")
         update.message.reply_text("Registrei a compra. Bjs até a próxima")
@@ -140,8 +143,132 @@ def upload_data(update: Updater, context: CallbackContext):
     return ConversationHandler.END
 
 
+def get_manual_data():
+    url_manual_data = f"{config.data_sheet_url}{config.sheet_name_manual}"
+    manual_data = pd.read_csv(url_manual_data)
+    return manual_data
+
+
+def get_bot_data():
+    url_bot_data = f"{config.data_sheet_url}{config.sheet_name_bot}"
+    bot_data = pd.read_csv(url_bot_data)
+    return bot_data
+
+
+def process_manual_data(manual_data):
+    manual_data = manual_data[["data", "valor", "pagador"]]
+    manual_data["valor"].replace("R\$ ", "", regex=True, inplace=True)
+    manual_data["valor"].replace("\.", "", regex=True, inplace=True)
+    manual_data["valor"].replace("\,", ".", regex=True, inplace=True)
+    manual_data["valor"] = manual_data["valor"].astype(float)
+    manual_data["data"] = pd.to_datetime(manual_data["data"], format="%d/%m/%Y")
+    manual_data["pagador"].replace("joao", "joão", regex=True, inplace=True)
+    return manual_data
+
+
+def process_bot_data(bot_data):
+    bot_data.drop(["Tipo", "Descrição"], axis=1, inplace=True)
+    bot_data.rename(
+        {"Carimbo de data/hora": "data", "Valor": "valor", "Responsável": "pagador"},
+        axis=1,
+        inplace=True,
+    )
+    bot_data["data"].replace(" \d{2}\:\d{2}\:\d{2}", "", regex=True, inplace=True)
+    bot_data["data"] = pd.to_datetime(bot_data["data"], format="%d/%m/%Y")
+    bot_data["valor"].replace("\,", ".", regex=True, inplace=True)
+    bot_data["valor"] = bot_data["valor"].astype(float)
+    return bot_data
+
+
+def get_data():
+    manual_data = get_manual_data()
+    manual_data = process_manual_data(manual_data)
+
+    bot_data = get_bot_data()
+    bot_data = process_bot_data(bot_data)
+
+    all_data = pd.concat([manual_data, bot_data])
+    return all_data
+
+
+def process_args(args):
+    month = args[0]
+    try:
+        year = args[1]
+    except IndexError:
+        year = date.today().year
+    return month, year
+
+
+def filter_target_month(data, month, year):
+    target_month_data = data[data["data"].dt.month == month]
+    target_month_data = target_month_data[target_month_data["data"].dt.year == year]
+    return target_month_data
+
+
+def calculate_total_expenses(target_df):
+    total_month = target_df["valor"].sum()
+    return total_month
+
+
+def calculate_payments_breakdown(target_df):
+    payments_breakdown = target_df.groupby("pagador").sum("valor")
+
+    payments_done = {}
+    for person in ["bruno", "joão", "raissa"]:
+        try:
+            payments_done[person] = payments_breakdown.loc[person, "valor"]
+        except KeyError:
+            payments_done[person] = 0
+
+    return payments_done
+
+
+def calculate_cost_division(total_month):
+    cost_division = {}
+    cost_division["bruno"] = round(total_month * 0.3642, 2)
+    cost_division["joão"] = round(total_month * 0.3642, 2)
+    cost_division["raissa"] = round(total_month * 0.2716, 2)
+
+    return cost_division
+
+
+def calculate_final_balance(cost_division, payments_done):
+    final_balance = {
+        key: round(cost_division[key] - payments_done[key], 2)
+        for key in cost_division.keys()
+    }
+    return final_balance
+
+
+def create_fechamento_message(
+    month, year, total_month, cost_division, payments_done, final_balance
+):
+    fechamento_string = f"Gastos totais do mês {month}/{year}: {total_month} \n\nDivisão de gastos:{facts_to_str(cost_division)} \nPagamentos realizados: {facts_to_str(payments_done)} \nSaldo final: {facts_to_str(final_balance)}"
+    return fechamento_string
+
+
+def fechamento_command(update: Updater, context: CallbackContext):
+    logging.info(
+        f"User '{update.message.chat['first_name']}' sent a '/fechamento' command"
+    )
+
+    df = get_data()
+    month, year = process_args(context.args)
+    target_df = filter_target_month(df, month, year)
+    total_month = calculate_total_expenses(target_df)
+    payments_breakdown = calculate_payments_breakdown(target_df)
+    cost_division = calculate_cost_division(total_month)
+    final_balance = calculate_final_balance(cost_division, payments_breakdown)
+    message_text = create_fechamento_message(
+        month, year, total_month, cost_division, payments_breakdown, final_balance
+    )
+
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message_text)
+
+
 def main():
-    updater = Updater(token=token, use_context=True)
+    updater = Updater(token=config.token, use_context=True)
     dispatcher = updater.dispatcher
 
     conv_handler = ConversationHandler(
@@ -183,7 +310,10 @@ def main():
         fallbacks=[MessageHandler(Filters.regex("^(r|R)eset$|^Não$"), done)],
     )
 
+    fechamento_handler = CommandHandler("fechamento", fechamento_command)
+
     dispatcher.add_handler(conv_handler)
+    dispatcher.add_handler(fechamento_handler)
 
     updater.start_polling()
     updater.idle()
