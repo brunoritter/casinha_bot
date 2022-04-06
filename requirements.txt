@@ -15,7 +15,6 @@ google-auth==2.6.2
 google-auth-oauthlib==0.5.1
 httplib2==0.20.4
 idna==3.3
-ipykernel==6.12.1
 ipython==8.2.0
 jedi==0.18.1
 jupyter-client==7.2.1
