@@ -217,7 +217,7 @@ def calculate_payments_breakdown(target_df):
     payments_done = {}
     for person in ["bruno", "joão", "raissa"]:
         try:
-            payments_done[person] = payments_breakdown.loc[person, "valor"]
+            payments_done[person] = round(payments_breakdown.loc[person, "valor"], 2)
         except KeyError:
             payments_done[person] = 0
 
