@@ -145,6 +145,7 @@ def upload_data(update: Updater, context: CallbackContext):
 
 def get_manual_data():
     url_manual_data = f"{config.data_sheet_url}{config.sheet_name_manual}"
+    print(url_manual_data)
     manual_data = pd.read_csv(url_manual_data)
     return manual_data
 
