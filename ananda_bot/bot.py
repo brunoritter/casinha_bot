@@ -86,11 +86,7 @@ def buyer_name(update: Updater, context: CallbackContext):
         f"User '{update.message.chat['first_name']}' reported the expense description was: {user_input}"
     )
 
-    keyboard = [
-        ["Bruno"],
-        ["Raissa"],
-        ["João"],
-    ]
+    keyboard = [[user] for user in config.user_data.keys()]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
     update.message.reply_text("Quem fez essa compra?", reply_markup=reply_markup)
@@ -215,7 +211,7 @@ def calculate_payments_breakdown(target_df):
     payments_breakdown = target_df.groupby("pagador").sum("valor")
 
     payments_done = {}
-    for person in ["bruno", "joão", "raissa"]:
+    for person in config.user_data.keys():
         try:
             payments_done[person] = round(payments_breakdown.loc[person, "valor"], 2)
         except KeyError:
@@ -225,10 +221,9 @@ def calculate_payments_breakdown(target_df):
 
 
 def calculate_cost_division(total_month):
-    cost_division = {}
-    cost_division["bruno"] = round(total_month * 0.3642, 2)
-    cost_division["joão"] = round(total_month * 0.3642, 2)
-    cost_division["raissa"] = round(total_month * 0.2716, 2)
+    cost_division = {
+        user: round(total_month * share, 2) for user, share in config.user_data.items()
+    }
 
     return cost_division
 
