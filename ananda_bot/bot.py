@@ -141,12 +141,14 @@ def upload_data(update: Updater, context: CallbackContext):
 
 def get_manual_data():
     url_manual_data = f"{config.data_sheet_url}{config.sheet_name_manual}"
+    print(f"Trying url: {url_manual_data}")
     manual_data = pd.read_csv(url_manual_data)
     return manual_data
 
 
 def get_bot_data():
     url_bot_data = f"{config.data_sheet_url}{config.sheet_name_bot}"
+    print(f"Trying url: {url_bot_data}")
     bot_data = pd.read_csv(url_bot_data)
     return bot_data
 
